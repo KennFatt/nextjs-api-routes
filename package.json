@@ -1,0 +1,30 @@
+{
+  "name": "nextjs-api-routes",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test": "NODE_ENV=test mocha",
+    "fmt": "prettier --write \"./lib/**/*.js\" \"./pages/**/*.{js,ts,jsx,tsx}\" \"./test/**/*.js\""
+  },
+  "dependencies": {
+    "autoprefixer": "^10.3.2",
+    "next": "11.1.0",
+    "postcss": "^8.3.6",
+    "react": "17.0.2",
+    "react-dom": "17.0.2",
+    "tailwindcss": "^2.2.7"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.15.0",
+    "@babel/register": "^7.15.3",
+    "eslint": "7.32.0",
+    "eslint-config-next": "11.1.0",
+    "eslint-config-prettier": "^8.3.0",
+    "mocha": "^9.1.0",
+    "prettier": "^2.3.2"
+  }
+}
