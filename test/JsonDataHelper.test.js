@@ -9,10 +9,46 @@ import {
   deleteRecord,
 } from "../lib/JsonDataHelper";
 
-function removeTestingFile() {
-  if (fs.existsSync(JSON_DATA_PATH)) {
-    fs.rmSync(JSON_DATA_PATH);
-  }
+function cleanUpTestFile() {
+  try {
+    fs.rmSync(JSON_DATA_PATH, { recursive: true });
+  } catch {}
+}
+
+/**
+ * Create a suite that run the `hook` callback right
+ *  before and after the suite rather than the `it()`.
+ *
+ * This is useful to clean up the data before specifying a scenario.
+ *
+ * Adapting from SO's answer:
+ * @see https://stackoverflow.com/a/26111323/6569706
+ *
+ * MochaJS's GitHub Issue #911:
+ * @see https://github.com/mochajs/mocha/issues/911
+ *
+ * @param {string} suiteName
+ * @param {Function|undefined} hook
+ * @param {Function} tests
+ */
+function describeWithHook(suiteName, hook, tests) {
+  const callHook = () => {
+    if (typeof hook === "function") {
+      hook.call(null);
+    }
+  };
+
+  describe(suiteName, () => {
+    before(() => {
+      callHook();
+    });
+
+    tests();
+
+    after(() => {
+      callHook();
+    });
+  });
 }
 
 /**
@@ -26,14 +62,14 @@ function removeTestingFile() {
  *    - Write new file with JSON content that includes an empty array.
  *    - Read existing JSON content from a file.
  *
- * 2. getRecordDataById()
- *    - It should be hrowing an error if the given `id` is not found.
- *    - Returning an object that has `id` key match with the given `id`.
- *
- * 3. insertRecord()
+ * 2. insertRecord()
  *    - Inserting new record then calling `loadRecords` and get the latest element
  *        should be equal (deep comparison) to the `newRecord` object.
  *    - Inserting an existing record should throw an error.
+ *
+ * 3. getRecordDataById()
+ *    - It should be throwing an error if the given `id` is not found.
+ *    - Returning an object that has `id` key match with the given `id`.
  *
  * 4. updateRecord()
  *    - The latest data (from `loadRecords`) should includes the new record object.
@@ -44,10 +80,12 @@ function removeTestingFile() {
  *    - It should be throwing an error if the record does not exist.
  *    - The `data` length should be decreased by 1 (respective to the length before function calls)
  */
-describe("JsonDataHelper", () => {
-  after(() => {
-    removeTestingFile();
-  });
+describeWithHook("JsonDataHelper", cleanUpTestFile, () => {
+  const dummyRecord = {
+    id: Date.now(),
+    email: "dummy@example.com",
+    message: "A dummy message",
+  };
 
   // start-of: suite 0
   describe("All functions (except `loadRecords`) require an array as its first parameter.", () => {
@@ -59,7 +97,7 @@ describe("JsonDataHelper", () => {
     ].map((fn) => fn.bind(null, false));
 
     boundFns.forEach((boundFn) => {
-      it(`Calling function: ${boundFn.name}  should throw an error`, () => {
+      it(`Calling function: ${boundFn.name} should throw an error`, () => {
         assert.throws(boundFn, {
           name: "TypeError",
           message: "The `data` argument supposed to be an array!",
@@ -71,28 +109,22 @@ describe("JsonDataHelper", () => {
 
   // start-of: suite 1
   describe("Helper function: loadRecords()", () => {
-    afterEach(() => {
-      removeTestingFile();
-    });
+    describeWithHook(
+      "Init call should generate new file and return an empty array",
+      cleanUpTestFile,
+      () => {
+        it("File exists on filesystem", () => {
+          loadRecords();
+          assert.ok(fs.existsSync(JSON_DATA_PATH));
+        });
 
-    describe("Init call should generate new file and return an empty array", () => {
-      const records = loadRecords();
+        it("Returns an empty array", () => {
+          assert.deepEqual(loadRecords(), []);
+        });
+      }
+    );
 
-      it("File exists on filesystem", () => {
-        assert.ok(fs.existsSync(JSON_DATA_PATH));
-      });
-
-      it("Returns an empty array", () => {
-        assert.deepEqual(records, []);
-      });
-    });
-
-    describe("Read existing JSON file", () => {
-      const dummyRecord = {
-        id: Date.now(),
-        email: "dummy@example.com",
-        message: "A dummy message",
-      };
+    describeWithHook("Read existing JSON file", cleanUpTestFile, () => {
       const jsonContent = JSON.stringify([dummyRecord], null, 4);
       fs.writeFileSync(JSON_DATA_PATH, jsonContent, { encoding: "utf-8" });
 
