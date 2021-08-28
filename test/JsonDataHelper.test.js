@@ -2,6 +2,7 @@ import assert from "assert/strict";
 import fs from "fs";
 import {
   JSON_DATA_PATH,
+  createRecordObject,
   insertRecord,
   loadRecords,
   getRecordDataById,
@@ -16,75 +17,37 @@ function cleanUpTestFile() {
 }
 
 /**
- * Create a suite that run the `hook` callback right
- *  before and after the suite rather than the `it()`.
- *
- * This is useful to clean up the data before specifying a scenario.
- *
- * Adapting from SO's answer:
- * @see https://stackoverflow.com/a/26111323/6569706
- *
- * MochaJS's GitHub Issue #911:
- * @see https://github.com/mochajs/mocha/issues/911
- *
- * @param {string} suiteName
- * @param {Function|undefined} hook
- * @param {Function} tests
- */
-function describeWithHook(suiteName, hook, tests) {
-  const callHook = () => {
-    if (typeof hook === "function") {
-      hook.call(null);
-    }
-  };
-
-  describe(suiteName, () => {
-    before(() => {
-      callHook();
-    });
-
-    tests();
-
-    after(() => {
-      callHook();
-    });
-  });
-}
-
-/**
  * Test suites:
  *
  * 0. All functions
  *    - All methods should throwing an error (TypeError with the exact same message)
  *        if the `data` parameter is not an array.
  *
- * 1. loadRecords()
- *    - Write new file with JSON content that includes an empty array.
- *    - Read existing JSON content from a file.
+ * 1. Programatically create a record object with: `createRecordObject()`
+ *    - Validating produced object's keys with its creation arguments.
+ *    - The object created by `createRecordObject()` should be immutable.
  *
- * 2. insertRecord()
- *    - Inserting new record then calling `loadRecords` and get the latest element
- *        should be equal (deep comparison) to the `newRecord` object.
- *    - Inserting an existing record should throw an error.
+ * 2. Data initialization with: `loadRecords()`
+ *    - Calling the function `loadRecords()` should generate a JSON file.
+ *    - The array returned from `loadRecords()` should be empty in the first call.
  *
- * 3. getRecordDataById()
- *    - It should be throwing an error if the given `id` is not found.
- *    - Returning an object that has `id` key match with the given `id`.
+ * 3. Data insertion with: `insertRecord()`
+ *    - Valid record object should satisfy `{id, email, message}` as its keys.
+ *    - Function `insertRecord()` will mutates the original array and return it
+ *        back when insertion succeed.
  *
- * 4. updateRecord()
- *    - The latest data (from `loadRecords`) should includes the new record object.
- *    - The length of `data` array before and after calling the function should be the same.
- *    - It should be throwing an error when updating the record with non existing id.
- *
- * 5. deleteRecord()
- *    - It should be throwing an error if the record does not exist.
- *    - The `data` length should be decreased by 1 (respective to the length before function calls)
+ * 4. Inserting and writing the data with: `insertRecord()`, `loadRecords()`, and `getRecordDataById()`
+ *    - Data insertion should be working just fine with object returned from `createRecordObject()`.
+ *    - Finding specific id with `geRecordDataById()` should be working just fine.
+ *    - If the given `recordId` to function `getRecordDataById()` does not exist in the database, then
+ *        an error should be thrown.
  */
-describeWithHook("JsonDataHelper", cleanUpTestFile, () => {
-  const dummyRecord = {
-    id: Date.now(),
+describe("JsonDataHelper", () => {
+  after(() => cleanUpTestFile());
+
+  const dummyRecordData = {
     email: "dummy@example.com",
-    message: "A dummy message",
+    message: "Consequat proident cupidatat amet non.",
   };
 
   // start-of: suite 0
@@ -108,32 +71,152 @@ describeWithHook("JsonDataHelper", cleanUpTestFile, () => {
   // end-of: suite 0
 
   // start-of: suite 1
-  describe("Helper function: loadRecords()", () => {
-    describeWithHook(
-      "Init call should generate new file and return an empty array",
-      cleanUpTestFile,
-      () => {
-        it("File exists on filesystem", () => {
-          loadRecords();
-          assert.ok(fs.existsSync(JSON_DATA_PATH));
-        });
-
-        it("Returns an empty array", () => {
-          assert.deepEqual(loadRecords(), []);
-        });
-      }
+  describe("createRecordObject(): Programatically creating a new record object.", () => {
+    const record = createRecordObject(
+      dummyRecordData.email,
+      dummyRecordData.message
     );
 
-    describeWithHook("Read existing JSON file", cleanUpTestFile, () => {
-      const jsonContent = JSON.stringify([dummyRecord], null, 4);
-      fs.writeFileSync(JSON_DATA_PATH, jsonContent, { encoding: "utf-8" });
+    it(`Email property value equals to: \`${dummyRecordData.email}\``, () => {
+      assert.strictEqual(record.email, dummyRecordData.email);
+    });
 
-      const records = loadRecords();
+    it(`Message property value equals to: \`${dummyRecordData.message}\``, () => {
+      assert.strictEqual(record.message, dummyRecordData.message);
+    });
 
-      it("The records[0] should equal to the dummy data", () => {
-        assert.deepEqual(records[0], dummyRecord);
-      });
+    it("Produced object is immutable by default", () => {
+      assert.throws(
+        () => {
+          record.email = "";
+          record.message = "";
+        },
+        { name: "TypeError" }
+      );
     });
   });
   // end-of: suite 1
+
+  // start-of: suite 2
+  describe("loadRecords(): Loading the data from filesystem.", () => {
+    after(() => cleanUpTestFile());
+
+    const records = loadRecords();
+
+    it("Writes a new file on filesystem", () => {
+      assert.strictEqual(fs.existsSync(JSON_DATA_PATH), true);
+    });
+
+    it("Initial data is equal to empty array", () => {
+      assert.deepStrictEqual(records, []);
+    });
+  });
+  // end-of: suite 2
+
+  // start-of: suite 3
+  describe("insertRecord(): Inserting new record into database.", () => {
+    after(() => cleanUpTestFile());
+
+    const records = loadRecords();
+    const record = createRecordObject(
+      dummyRecordData.email,
+      dummyRecordData.message
+    );
+    const recordKeysString = Object.keys(record).join(",");
+
+    it("Record object without `email` property will throw an error", () => {
+      assert.throws(
+        () => {
+          insertRecord(records, { message: "" });
+        },
+        {
+          name: "Error",
+          message: "The `newRecord` object has missing mandatory keys.",
+        }
+      );
+    });
+
+    it("Record object without `message` property will throw an error", () => {
+      assert.throws(
+        () => {
+          insertRecord(records, { email: "" });
+        },
+        {
+          name: "Error",
+          message: "The `newRecord` object has missing mandatory keys.",
+        }
+      );
+    });
+
+    it("Record object without `id` property will throw an error", () => {
+      assert.throws(
+        () => {
+          insertRecord(records, { email: "", message: "" });
+        },
+        {
+          name: "Error",
+          message: "The `newRecord` object has missing mandatory keys.",
+        }
+      );
+    });
+
+    it(`Record object should satisfy these properties: \`${recordKeysString}\``, () => {
+      assert.doesNotThrow(() => {
+        insertRecord(records, record);
+      });
+    });
+
+    it("Returns array reference to its original data (mutates the `data` parameter)", () => {
+      const latestRecords = insertRecord(records, record);
+      assert.deepStrictEqual(latestRecords, records);
+    });
+  });
+  // end-of: suite 3
+
+  // start-of: suite 4
+  describe("loadRecords(), getRecordDataById(): Reading record(s) from the database.", () => {
+    after(() => cleanUpTestFile());
+
+    const records = loadRecords();
+    const dummyRecords = [
+      createRecordObject("dummy0@example.com", "A dummy message"),
+      createRecordObject("dummy1@example.com", "A dummy message"),
+      createRecordObject("dummy2@example.com", "A dummy message"),
+    ];
+    const dummyRecordsLength = dummyRecords.length;
+    const randomIndex = Math.floor(Math.random() * dummyRecordsLength);
+    const findRecordTarget = dummyRecords[randomIndex];
+
+    dummyRecords.forEach((dummyRecord) => {
+      insertRecord(records, dummyRecord);
+    });
+
+    it(`After insertion, the \`data\` array is now should have length of: \`${dummyRecordsLength}\``, () => {
+      assert.strictEqual(records.length, dummyRecordsLength);
+    });
+
+    it(`Find by specific id: \`${findRecordTarget.id}\` should return the exact record object`, () => {
+      const foundRecord = getRecordDataById(records, findRecordTarget.id);
+      assert.deepStrictEqual(foundRecord, findRecordTarget);
+    });
+
+    it("Throws an error if given `recordId` does not exist in the database", () => {
+      const validIds = dummyRecords.map((dummyRecord) => dummyRecord.id);
+      let randomId = 0;
+      while (validIds.includes(randomId)) {
+        randomId = ~~(Math.random() * (1 << 30));
+      }
+
+      assert.throws(
+        () => {
+          getRecordDataById(records, randomId);
+        },
+        {
+          name: "Error",
+          message: `Record with id ${randomId} does not exists.`,
+        }
+      );
+    });
+  });
+  // end-of: suite 4
 });
