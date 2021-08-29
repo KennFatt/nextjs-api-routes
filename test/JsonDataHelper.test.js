@@ -17,6 +17,39 @@ function cleanUpTestFile() {
 }
 
 /**
+ * Create new scenario (databases, dummy data, and random dummy data's index).
+ *
+ * It is pretty neat and useful for checking record existance,
+ *  getting a record by its id, updating and/or deleting a record.
+ *
+ * @param {boolean} shouldInsertData
+ * @param {number} recordCount
+ */
+function createDummyFeedbackScenario(
+  shouldInsertData = false,
+  recordCount = 3
+) {
+  const validRecords = loadRecords();
+  const dummyRecords = Array(recordCount)
+    .fill(null)
+    .map((_, idx) => {
+      const dummyRecord = createRecordObject(
+        `dummy${idx}@example.com`,
+        "A dummy message"
+      );
+
+      if (shouldInsertData) {
+        insertRecord(validRecords, dummyRecord);
+      }
+
+      return dummyRecord;
+    });
+  const randomDummyRecordIndex = ~~(Math.random() * dummyRecords.length);
+
+  return { validRecords, dummyRecords, randomDummyRecordIndex };
+}
+
+/**
  * Test suites:
  *
  * 0. All functions
@@ -117,17 +150,16 @@ describe("JsonDataHelper", () => {
   describe("insertRecord(): Inserting new record into database.", () => {
     after(() => cleanUpTestFile());
 
-    const records = loadRecords();
-    const record = createRecordObject(
-      dummyRecordData.email,
-      dummyRecordData.message
+    const { validRecords, dummyRecords } = createDummyFeedbackScenario(
+      false,
+      1
     );
-    const recordKeysString = Object.keys(record).join(",");
+    const validRecordKeys = Object.keys(dummyRecords[0]).join(",");
 
     it("Record object without `email` property will throw an error", () => {
       assert.throws(
         () => {
-          insertRecord(records, { message: "" });
+          insertRecord(validRecords, { message: "" });
         },
         {
           name: "Error",
@@ -139,7 +171,7 @@ describe("JsonDataHelper", () => {
     it("Record object without `message` property will throw an error", () => {
       assert.throws(
         () => {
-          insertRecord(records, { email: "" });
+          insertRecord(validRecords, { email: "" });
         },
         {
           name: "Error",
@@ -151,7 +183,7 @@ describe("JsonDataHelper", () => {
     it("Record object without `id` property will throw an error", () => {
       assert.throws(
         () => {
-          insertRecord(records, { email: "", message: "" });
+          insertRecord(validRecords, { email: "", message: "" });
         },
         {
           name: "Error",
@@ -160,15 +192,16 @@ describe("JsonDataHelper", () => {
       );
     });
 
-    it(`Record object should satisfy these properties: \`${recordKeysString}\``, () => {
+    it(`Record object should satisfy these properties: \`${validRecordKeys}\``, () => {
       assert.doesNotThrow(() => {
-        insertRecord(records, record);
+        insertRecord(validRecords, dummyRecords[0]);
       });
     });
 
     it("Returns array reference to its original data (mutates the `data` parameter)", () => {
-      const latestRecords = insertRecord(records, record);
-      assert.deepStrictEqual(latestRecords, records);
+      const latestRecords = insertRecord(validRecords, dummyRecords[0]);
+
+      assert.deepStrictEqual(latestRecords, validRecords);
     });
   });
   // end-of: suite 3
@@ -177,39 +210,39 @@ describe("JsonDataHelper", () => {
   describe("loadRecords(), getRecordDataById(): Reading record(s) from the database.", () => {
     after(() => cleanUpTestFile());
 
-    const records = loadRecords();
-    const dummyRecords = [
-      createRecordObject("dummy0@example.com", "A dummy message"),
-      createRecordObject("dummy1@example.com", "A dummy message"),
-      createRecordObject("dummy2@example.com", "A dummy message"),
-    ];
-    const dummyRecordsLength = dummyRecords.length;
-    const randomIndex = Math.floor(Math.random() * dummyRecordsLength);
-    const findRecordTarget = dummyRecords[randomIndex];
+    const { validRecords, dummyRecords, randomDummyRecordIndex } =
+      createDummyFeedbackScenario(true);
 
-    dummyRecords.forEach((dummyRecord) => {
-      insertRecord(records, dummyRecord);
+    it(`After insertion, the \`data\` array is now should have length of: \`${dummyRecords.length}\``, () => {
+      assert.strictEqual(validRecords.length, dummyRecords.length);
     });
 
-    it(`After insertion, the \`data\` array is now should have length of: \`${dummyRecordsLength}\``, () => {
-      assert.strictEqual(records.length, dummyRecordsLength);
-    });
+    it(`Find by specific id: \`${dummyRecords[randomDummyRecordIndex].id}\` should return the exact record object`, () => {
+      const foundRecord = getRecordDataById(
+        validRecords,
+        dummyRecords[randomDummyRecordIndex].id
+      );
 
-    it(`Find by specific id: \`${findRecordTarget.id}\` should return the exact record object`, () => {
-      const foundRecord = getRecordDataById(records, findRecordTarget.id);
-      assert.deepStrictEqual(foundRecord, findRecordTarget);
+      assert.deepStrictEqual(foundRecord, dummyRecords[randomDummyRecordIndex]);
     });
 
     it("Throws an error if given `recordId` does not exist in the database", () => {
-      const validIds = dummyRecords.map((dummyRecord) => dummyRecord.id);
-      let randomId = 0;
-      while (validIds.includes(randomId)) {
-        randomId = ~~(Math.random() * (1 << 30));
-      }
+      const randomId = dummyRecords.reduce((delegateId, rec) => {
+        if (rec.id !== delegateId) {
+          return delegateId;
+        }
+
+        do {
+          let newDelegateId = ~~(Math.random() * (1 << 30));
+          if (newDelegateId !== rec.id) {
+            return newDelegateId;
+          }
+        } while (true);
+      }, 0);
 
       assert.throws(
         () => {
-          getRecordDataById(records, randomId);
+          getRecordDataById(validRecords, randomId);
         },
         {
           name: "Error",
