@@ -27,7 +27,7 @@ function cleanUpTestFile() {
  */
 function createDummyFeedbackScenario(
   shouldInsertData = false,
-  recordCount = 3
+  recordCount = 1
 ) {
   const validRecords = loadRecords();
   const dummyRecords = Array(recordCount)
@@ -74,6 +74,13 @@ function createDummyFeedbackScenario(
  *    - Finding specific id with `geRecordDataById()` should be working just fine.
  *    - If the given `recordId` to function `getRecordDataById()` does not exist in the database, then
  *        an error should be thrown.
+ *
+ * 5. Updating the data with: `updateRecord()`
+ *    - Updating old record will replace the data index's value with the newest one.
+ *        data[N] = oldData -> data[N] = newData
+ *        The updating mechanism only rely on array index (`[]`) operator.
+ *    - Updating with the exact same data does not trigger database to write the data.
+ *    - Updating invalid or non exist id will throw an error.
  */
 describe("JsonDataHelper", () => {
   after(() => cleanUpTestFile());
@@ -150,10 +157,7 @@ describe("JsonDataHelper", () => {
   describe("insertRecord(): Inserting new record into database.", () => {
     after(() => cleanUpTestFile());
 
-    const { validRecords, dummyRecords } = createDummyFeedbackScenario(
-      false,
-      1
-    );
+    const { validRecords, dummyRecords } = createDummyFeedbackScenario();
     const validRecordKeys = Object.keys(dummyRecords[0]).join(",");
 
     it("Record object without `email` property will throw an error", () => {
@@ -227,29 +231,48 @@ describe("JsonDataHelper", () => {
     });
 
     it("Throws an error if given `recordId` does not exist in the database", () => {
-      const randomId = dummyRecords.reduce((delegateId, rec) => {
-        if (rec.id !== delegateId) {
-          return delegateId;
-        }
-
-        do {
-          let newDelegateId = ~~(Math.random() * (1 << 30));
-          if (newDelegateId !== rec.id) {
-            return newDelegateId;
-          }
-        } while (true);
-      }, 0);
-
       assert.throws(
         () => {
-          getRecordDataById(validRecords, randomId);
+          getRecordDataById(validRecords, -1);
         },
         {
           name: "Error",
-          message: `Record with id ${randomId} does not exists.`,
+          message: `Record with id ${-1} does not exists.`,
         }
       );
     });
   });
   // end-of: suite 4
+
+  // start-of: suite 5
+  describe("updateRecord(): Updating specific data from the database", () => {
+    const { validRecords } = createDummyFeedbackScenario(false, 3);
+    const oldRecord = validRecords[0];
+    const newRecord = createRecordObject("replacer@example.com", "");
+
+    it(`Updates a record with id of \`${oldRecord.id}\` with new record whose id \`${newRecord.id}\``, () => {
+      assert.ok(updateRecord(validRecords, oldRecord.id, newRecord));
+    });
+
+    it("Updating data with existing record (`FeedbackRecord`) should not update the database", () => {
+      const { validRecords } = createDummyFeedbackScenario();
+      assert.strictEqual(
+        updateRecord(validRecords, validRecords[0].id, validRecords[0]),
+        false
+      );
+    });
+
+    it("Updating data with NON existing record (`FeedbackRecord`) should throw an error", () => {
+      assert.throws(
+        () => {
+          updateRecord(validRecords, -1, newRecord);
+        },
+        {
+          name: "Error",
+          message: "The record with an `id` of -1 does not exist!",
+        }
+      );
+    });
+  });
+  // end-of: suite 5
 });
