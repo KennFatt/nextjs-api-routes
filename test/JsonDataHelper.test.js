@@ -10,44 +10,9 @@ import {
   deleteRecord,
 } from "../lib/JsonDataHelper";
 
-function cleanUpTestFile() {
-  try {
-    fs.rmSync(JSON_DATA_PATH, { recursive: true });
-  } catch {}
-}
-
-/**
- * Create new scenario (databases, dummy data, and random dummy data's index).
- *
- * It is pretty neat and useful for checking record existance,
- *  getting a record by its id, updating and/or deleting a record.
- *
- * @param {boolean} shouldInsertData
- * @param {number} recordCount
- */
-function createDummyFeedbackScenario(
-  shouldInsertData = false,
-  recordCount = 1
-) {
-  const validRecords = loadRecords();
-  const dummyRecords = Array(recordCount)
-    .fill(null)
-    .map((_, idx) => {
-      const dummyRecord = createRecordObject(
-        `dummy${idx}@example.com`,
-        "A dummy message"
-      );
-
-      if (shouldInsertData) {
-        insertRecord(validRecords, dummyRecord);
-      }
-
-      return dummyRecord;
-    });
-  const randomDummyRecordIndex = ~~(Math.random() * dummyRecords.length);
-
-  return { validRecords, dummyRecords, randomDummyRecordIndex };
-}
+const DUMMY_EMAIL = "dummy{id}@example.com";
+const DUMMY_MESSAGE = "Consequat proident cupidatat amet non.";
+const DUMMY_RECORD = createRecordObject(DUMMY_EMAIL, DUMMY_MESSAGE);
 
 /**
  * Test suites:
@@ -81,14 +46,21 @@ function createDummyFeedbackScenario(
  *        The updating mechanism only rely on array index (`[]`) operator.
  *    - Updating with the exact same data does not trigger database to write the data.
  *    - Updating invalid or non exist id will throw an error.
+ *
+ * 6. Deleting specific data from the database with: `deleteRecord()`
+ *    - `deleteRecord()` function should return a removed record object.
+ *    - Removing the record should updates the data array too.
  */
-describe("JsonDataHelper", () => {
-  after(() => cleanUpTestFile());
+describeClean("JsonDataHelper", () => {
+  describeClean("Testing to create fake test scenario", () => {
+    const length = 5;
 
-  const dummyRecordData = {
-    email: "dummy@example.com",
-    message: "Consequat proident cupidatat amet non.",
-  };
+    it(`The generated data length should be: \`${length}\``, () => {
+      const records = createDummyFeedbackScenario(true, length);
+
+      assert.strictEqual(records.length, length);
+    });
+  });
 
   // start-of: suite 0
   describe("All functions (except `loadRecords`) require an array as its first parameter.", () => {
@@ -112,24 +84,19 @@ describe("JsonDataHelper", () => {
 
   // start-of: suite 1
   describe("createRecordObject(): Programatically creating a new record object.", () => {
-    const record = createRecordObject(
-      dummyRecordData.email,
-      dummyRecordData.message
-    );
-
-    it(`Email property value equals to: \`${dummyRecordData.email}\``, () => {
-      assert.strictEqual(record.email, dummyRecordData.email);
+    it(`Email property value equals to: \`${DUMMY_EMAIL}\``, () => {
+      assert.strictEqual(DUMMY_RECORD.email, DUMMY_EMAIL);
     });
 
-    it(`Message property value equals to: \`${dummyRecordData.message}\``, () => {
-      assert.strictEqual(record.message, dummyRecordData.message);
+    it(`Message property value equals to: \`${DUMMY_MESSAGE}\``, () => {
+      assert.strictEqual(DUMMY_RECORD.message, DUMMY_MESSAGE);
     });
 
     it("Produced object is immutable by default", () => {
       assert.throws(
         () => {
-          record.email = "";
-          record.message = "";
+          DUMMY_RECORD.email = "";
+          DUMMY_RECORD.message = "";
         },
         { name: "TypeError" }
       );
@@ -138,32 +105,28 @@ describe("JsonDataHelper", () => {
   // end-of: suite 1
 
   // start-of: suite 2
-  describe("loadRecords(): Loading the data from filesystem.", () => {
-    after(() => cleanUpTestFile());
-
-    const records = loadRecords();
-
+  describeClean("loadRecords(): Loading the data from filesystem.", () => {
     it("Writes a new file on filesystem", () => {
+      loadRecords();
+
       assert.strictEqual(fs.existsSync(JSON_DATA_PATH), true);
     });
 
     it("Initial data is equal to empty array", () => {
-      assert.deepStrictEqual(records, []);
+      assert.deepStrictEqual(loadRecords(), []);
     });
   });
   // end-of: suite 2
 
   // start-of: suite 3
-  describe("insertRecord(): Inserting new record into database.", () => {
-    after(() => cleanUpTestFile());
-
-    const { validRecords, dummyRecords } = createDummyFeedbackScenario();
-    const validRecordKeys = Object.keys(dummyRecords[0]).join(",");
+  describeClean("insertRecord(): Inserting new record into database.", () => {
+    const records = createDummyFeedbackScenario(true);
+    const validRecordKeys = Object.keys(records[0]).join(",");
 
     it("Record object without `email` property will throw an error", () => {
       assert.throws(
         () => {
-          insertRecord(validRecords, { message: "" });
+          insertRecord(records, { message: "" });
         },
         {
           name: "Error",
@@ -175,7 +138,7 @@ describe("JsonDataHelper", () => {
     it("Record object without `message` property will throw an error", () => {
       assert.throws(
         () => {
-          insertRecord(validRecords, { email: "" });
+          insertRecord(records, { email: "" });
         },
         {
           name: "Error",
@@ -187,7 +150,7 @@ describe("JsonDataHelper", () => {
     it("Record object without `id` property will throw an error", () => {
       assert.throws(
         () => {
-          insertRecord(validRecords, { email: "", message: "" });
+          insertRecord(records, { email: "", message: "" });
         },
         {
           name: "Error",
@@ -198,81 +161,169 @@ describe("JsonDataHelper", () => {
 
     it(`Record object should satisfy these properties: \`${validRecordKeys}\``, () => {
       assert.doesNotThrow(() => {
-        insertRecord(validRecords, dummyRecords[0]);
+        insertRecord(records, records[0]);
       });
     });
 
     it("Returns array reference to its original data (mutates the `data` parameter)", () => {
-      const latestRecords = insertRecord(validRecords, dummyRecords[0]);
+      const latestRecords = insertRecord(records, records[0]);
 
-      assert.deepStrictEqual(latestRecords, validRecords);
+      assert.deepStrictEqual(latestRecords, records);
     });
   });
   // end-of: suite 3
 
   // start-of: suite 4
-  describe("loadRecords(), getRecordDataById(): Reading record(s) from the database.", () => {
-    after(() => cleanUpTestFile());
+  describeClean(
+    "loadRecords(), getRecordDataById(): Reading record(s) from the database.",
+    () => {
+      const records = createDummyFeedbackScenario(true);
 
-    const { validRecords, dummyRecords, randomDummyRecordIndex } =
-      createDummyFeedbackScenario(true);
+      it(`After insertion, the \`data\` array is now should have length of: \`${
+        records.length + 1
+      }\``, () => {
+        const expectedLength = records.length + 1;
+        insertRecord(records, DUMMY_RECORD);
 
-    it(`After insertion, the \`data\` array is now should have length of: \`${dummyRecords.length}\``, () => {
-      assert.strictEqual(validRecords.length, dummyRecords.length);
-    });
+        assert.strictEqual(records.length, expectedLength);
+      });
 
-    it(`Find by specific id: \`${dummyRecords[randomDummyRecordIndex].id}\` should return the exact record object`, () => {
-      const foundRecord = getRecordDataById(
-        validRecords,
-        dummyRecords[randomDummyRecordIndex].id
-      );
+      it(`Find by specific id should return the exact record object`, () => {
+        const randomRecordIndex = ~~(Math.random() * records.length);
+        const findRecord = records[randomRecordIndex];
+        const foundRecord = getRecordDataById(records, findRecord.id);
 
-      assert.deepStrictEqual(foundRecord, dummyRecords[randomDummyRecordIndex]);
-    });
+        assert.deepStrictEqual(foundRecord, findRecord);
+      });
 
-    it("Throws an error if given `recordId` does not exist in the database", () => {
-      assert.throws(
-        () => {
-          getRecordDataById(validRecords, -1);
-        },
-        {
-          name: "Error",
-          message: `Record with id ${-1} does not exists.`,
-        }
-      );
-    });
-  });
+      it("Throws an error if given `recordId` does not exist in the database", () => {
+        assert.throws(
+          () => {
+            getRecordDataById(records, -1);
+          },
+          {
+            name: "Error",
+            message: `Record with id ${-1} does not exists.`,
+          }
+        );
+      });
+    }
+  );
   // end-of: suite 4
 
   // start-of: suite 5
-  describe("updateRecord(): Updating specific data from the database", () => {
-    const { validRecords } = createDummyFeedbackScenario(false, 3);
-    const oldRecord = validRecords[0];
-    const newRecord = createRecordObject("replacer@example.com", "");
+  describeClean(
+    "updateRecord(): Updating specific data from the database.",
+    () => {
+      const records = createDummyFeedbackScenario(false, 3);
+      const oldRecord = records[0];
+      const newRecord = DUMMY_RECORD;
 
-    it(`Updates a record with id of \`${oldRecord.id}\` with new record whose id \`${newRecord.id}\``, () => {
-      assert.ok(updateRecord(validRecords, oldRecord.id, newRecord));
-    });
+      it(`Updates a record with id of \`${oldRecord.id}\` with new record whose id \`${newRecord.id}\``, () => {
+        const recordsCopy = [...records];
 
-    it("Updating data with existing record (`FeedbackRecord`) should not update the database", () => {
-      const { validRecords } = createDummyFeedbackScenario();
-      assert.strictEqual(
-        updateRecord(validRecords, validRecords[0].id, validRecords[0]),
-        false
-      );
-    });
+        assert.ok(updateRecord(recordsCopy, oldRecord.id, newRecord));
+      });
 
-    it("Updating data with NON existing record (`FeedbackRecord`) should throw an error", () => {
-      assert.throws(
-        () => {
-          updateRecord(validRecords, -1, newRecord);
-        },
-        {
-          name: "Error",
-          message: "The record with an `id` of -1 does not exist!",
-        }
-      );
-    });
-  });
+      it("Updating data with existing record (`FeedbackRecord`) should not update the database", () => {
+        const recordsCopy = [...records];
+        const record = recordsCopy[0];
+
+        assert.strictEqual(updateRecord(recordsCopy, record.id, record), false);
+      });
+
+      it("Updating data with NON existing record (`FeedbackRecord`) should throw an error", () => {
+        const recordsCopy = [...records];
+
+        assert.throws(
+          () => {
+            updateRecord(recordsCopy, -1, newRecord);
+          },
+          {
+            name: "Error",
+            message: "The record with an `id` of -1 does not exist!",
+          }
+        );
+      });
+    }
+  );
   // end-of: suite 5
+
+  // start-of: suite 6
+  describeClean(
+    "deleteRecord(): Deleting specific record from the database.",
+    () => {
+      const records = createDummyFeedbackScenario(true, 3);
+      const targetDeleteRecord = records[0];
+
+      it("Remove a record from the database and return the removed record objecte", () => {
+        const recordsCopy = [...records];
+        const deletedRecord = deleteRecord(recordsCopy, targetDeleteRecord.id);
+
+        assert.deepStrictEqual(deletedRecord, targetDeleteRecord);
+      });
+
+      it("After removing single record, the length of the data is now should be `startLength - 1`", () => {
+        const recordsCopy = [...records];
+        const originalLength = records.length;
+        deleteRecord(recordsCopy, targetDeleteRecord.id);
+
+        assert.strictEqual(recordsCopy.length, originalLength - 1);
+      });
+    }
+  );
+  // end-of: suite 6
 });
+
+/**
+ * Custom Mocha's `describe` function by wrapping it with
+ *  filesystem cleanup. This approach is used to prevent DRY.
+ *
+ * @param {string} title Suite title
+ * @param {Function} tests
+ * @returns {import("mocha").Suite}
+ */
+function describeClean(title, tests) {
+  const cleanUpFn = () => {
+    try {
+      fs.rmSync(JSON_DATA_PATH, { recursive: true });
+    } catch {}
+  };
+
+  return describe(title, () => {
+    before(() => cleanUpFn());
+    after(() => cleanUpFn());
+
+    tests();
+  });
+}
+
+/**
+ * Create new scenario (databases, dummy data, and random dummy data's index).
+ * NOTE: This function will read/write the actual JSON file from filesystem.
+ *
+ * It is pretty neat and useful for checking record existance,
+ *  getting a record by its id, updating and/or deleting a record.
+ *
+ * @param {boolean} shouldInsertData Insert generated dummy data into the JSON file.
+ * @param {number} recordCount Total amount of dummy data.
+ */
+function createDummyFeedbackScenario(
+  shouldInsertData = false,
+  recordCount = 1
+) {
+  const records = loadRecords();
+
+  if (shouldInsertData) {
+    for (let i = 0; i < recordCount; ++i) {
+      const dummyRecord = createRecordObject(
+        DUMMY_EMAIL.replace(/\{id\}/, i),
+        DUMMY_MESSAGE
+      );
+
+      insertRecord(records, dummyRecord);
+    }
+  }
+
+  return records;
+}

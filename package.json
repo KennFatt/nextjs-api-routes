@@ -8,11 +8,13 @@
     "start": "next start",
     "lint": "next lint",
     "test": "NODE_ENV=test mocha",
+    "test:report": "NODE_ENV=test mocha --reporter mochawesome --reporter-options reportDir=test-reports",
     "fmt": "prettier --write \"./lib/**/*.js\" \"./pages/**/*.{js,ts,jsx,tsx}\" \"./test/**/*.js\""
   },
   "dependencies": {
     "autoprefixer": "^10.3.2",
     "next": "11.1.0",
+    "next-connect": "^0.10.2",
     "postcss": "^8.3.6",
     "react": "17.0.2",
     "react-dom": "17.0.2",
@@ -25,6 +27,7 @@
     "eslint-config-next": "11.1.0",
     "eslint-config-prettier": "^8.3.0",
     "mocha": "^9.1.0",
+    "mochawesome": "^6.2.2",
     "prettier": "^2.3.2"
   }
 }
