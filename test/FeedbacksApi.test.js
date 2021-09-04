@@ -122,47 +122,43 @@ describe("API Route: GET,POST /api/feedbacks", () => {
   });
 });
 
-describe("API Route: GET /api/feedbacks/[id]", () => {
+describe("API Route: GET /api/feedbacks/[feedbackId]", () => {
   describe("with existing data", () => {
     after(() => cleanUp());
 
     /** @type {import("axios").AxiosResponse<any>} */
-    let postResponse = null;
-    /** @type {import("axios").AxiosResponse<any>} */
-    let getResponse = null;
+    let response = null;
 
     beforeEach(async () => {
-      if (postResponse === null) {
-        postResponse = await axios.post(API_ENDPOINT, DUMMY_PAYLOAD, {
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
+      const postResponse = await axios.post(API_ENDPOINT, DUMMY_PAYLOAD, {
+        headers: { "Content-Type": "application/json" },
+      });
 
-        getResponse = await axios.get(urlWithId(postResponse.data.data.id));
-      }
+      response = await axios.get(urlWithId(postResponse.data.data.id), {
+        validateStatus: false,
+      });
     });
 
-    it("Should be returning 200 status if the feedback exists", () => {
-      assert.strictEqual(getResponse.status, 200);
+    it("Should be returning 200 status if the feedback exists", async () => {
+      assert.strictEqual(response.status, 200);
     });
 
-    it("Should be returning a JSON", () => {
-      const contentType = getResponse.headers["content-type"];
+    it("Should be returning a JSON", async () => {
+      const contentType = response.headers["content-type"];
 
       // axios automatically parse "application/json" into JS object.
       // no need to check whether it is an object or not.
       assert.strictEqual(typeof contentType, "string");
       assert.ok(contentType.startsWith("application/json"));
-      assert.strictEqual(typeof getResponse.data, "object");
+      assert.strictEqual(typeof response.data, "object");
     });
 
-    it("Should be returning an object with `message` and `data` property", () => {
-      assert.ok("data" in getResponse.data);
+    it("Should be returning an object with `message` and `data` property", async () => {
+      assert.ok("data" in response.data);
     });
 
-    it("The `data` object should have `id`, `email`, and `message` property", () => {
-      const responseData = getResponse.data.data;
+    it("The `data` object should have `id`, `email`, and `message` property", async () => {
+      const responseData = response.data.data;
 
       assert.ok("id" in responseData);
       assert.ok("email" in responseData);
@@ -213,5 +209,15 @@ describe("API Route: GET /api/feedbacks/[id]", () => {
       assert.strictEqual(keys.length, 1);
       assert.strictEqual(keys[0], "message");
     });
+  });
+});
+
+describe("API Route: PUT /api/feedbacks/[feedbackId]", () => {
+  describe("Updating the data", () => {
+    it("Should be returning 201 when the data successfully updated");
+    it("Should be returning the most recent record object");
+    it("Should be returning 204 if there is no need to update");
+    it("Should be returning 404 if the given `feedbackId` does not exists");
+    it("If 404 then it should be returning a JSON object with error message");
   });
 });
