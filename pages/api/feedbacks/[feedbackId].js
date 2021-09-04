@@ -1,4 +1,8 @@
 import nc from "next-connect";
+import { sendErrorResponse } from "../../../lib/Utils";
+import { loadRecords, getRecordDataById } from "../../../lib/JsonDataHelper";
+
+const data = loadRecords();
 
 /**
  * GET /api/feedbacks/[id: number]
@@ -11,9 +15,13 @@ import nc from "next-connect";
  * @param {import("next").NextApiResponse} res
  */
 async function getHandler(req, res) {
-  res
-    .status(200)
-    .json({ message: "echo get method", feedbackId: req.query?.feedbackId });
+  try {
+    const numberFeedbackId = Number.parseInt(req.query?.feedbackId || -1);
+    const requestedData = getRecordDataById(data, numberFeedbackId);
+    res.status(200).json({ message: "OK", data: requestedData });
+  } catch (e) {
+    sendErrorResponse(e, 404, res);
+  }
 }
 
 /**
