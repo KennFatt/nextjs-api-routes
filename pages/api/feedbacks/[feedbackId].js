@@ -1,6 +1,11 @@
 import nc from "next-connect";
 import { sendErrorResponse } from "../../../lib/Utils";
-import { loadRecords, getRecordDataById } from "../../../lib/JsonDataHelper";
+import {
+  loadRecords,
+  getRecordDataById,
+  updateRecord,
+  createRecordObject,
+} from "../../../lib/JsonDataHelper";
 
 const data = loadRecords();
 
@@ -14,7 +19,7 @@ const data = loadRecords();
  * @param {import("next").NextApiRequest} req
  * @param {import("next").NextApiResponse} res
  */
-async function getHandler(req, res) {
+function getHandler(req, res) {
   try {
     const numberFeedbackId = Number.parseInt(req.query?.feedbackId || -1);
     const requestedData = getRecordDataById(data, numberFeedbackId);
@@ -36,10 +41,22 @@ async function getHandler(req, res) {
  * @param {import("next").NextApiRequest} req
  * @param {import("next").NextApiResponse} res
  */
-async function putHandler(req, res) {
-  res
-    .status(200)
-    .json({ message: "echo put method", feedbackId: req.query?.feedbackId });
+function putHandler(req, res) {
+  try {
+    const numberFeedbackId = Number.parseInt(req.query?.feedbackId || -1);
+    const newRecord = createRecordObject(req.body?.email, req.body?.message);
+    console.log({ data, numberFeedbackId, newRecord });
+    const isDataUpdated = updateRecord(data, numberFeedbackId, newRecord);
+
+    if (isDataUpdated) {
+      res.status(201).json({ message: "OK", data: data[data.length - 1] });
+    } else {
+      res.status(204);
+    }
+  } catch (e) {
+    console.error(e);
+    sendErrorResponse(e, 404, res);
+  }
 }
 
 /**
@@ -52,7 +69,7 @@ async function putHandler(req, res) {
  * @param {import("next").NextApiRequest} req
  * @param {import("next").NextApiResponse} res
  */
-async function deleteHandler(req, res) {
+function deleteHandler(req, res) {
   res
     .status(200)
     .json({ message: "echo delete method", feedbackId: req.query?.feedbackId });

@@ -16,7 +16,7 @@ const data = loadRecords();
  * @param {import("next").NextApiRequest} req
  * @param {import("next").NextApiResponse} res
  */
-async function getHandler(req, res) {
+function getHandler(req, res) {
   res.status(200).json({ message: "OK", data });
 }
 
@@ -29,7 +29,7 @@ async function getHandler(req, res) {
  * @param {import("next").NextApiRequest} req
  * @param {import("next").NextApiResponse} res
  */
-async function postHandler(req, res) {
+function postHandler(req, res) {
   try {
     const parsedRecord = createRecordObject(req.body?.email, req.body?.message);
     const insertedData = insertRecord(data, parsedRecord)[0];
