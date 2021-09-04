@@ -4,6 +4,7 @@ import {
   insertRecord,
   createRecordObject,
 } from "../../../lib/JsonDataHelper";
+import { sendErrorResponse } from "../../../lib/Utils";
 
 const data = loadRecords();
 
@@ -35,7 +36,7 @@ async function postHandler(req, res) {
 
     res.status(201).json({ message: "OK", data: insertedData });
   } catch (e) {
-    res.status(400).json({ message: e.getMessage() });
+    sendErrorResponse(e, 500, res);
   }
 }
 
