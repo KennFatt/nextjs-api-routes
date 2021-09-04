@@ -103,5 +103,10 @@ describe("API Route: /api/feedbacks", () => {
       assert.strictEqual(email, input.email);
       assert.strictEqual(message, input.message);
     });
+
+    it("The `data` property should have `id` (number) as its property", () => {
+      assert.ok("id" in response.data.data);
+      assert.strictEqual(typeof response.data.data.id, "number");
+    });
   });
 });
