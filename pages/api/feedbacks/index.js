@@ -1,4 +1,11 @@
 import nc from "next-connect";
+import {
+  loadRecords,
+  insertRecord,
+  createRecordObject,
+} from "../../../lib/JsonDataHelper";
+
+const data = loadRecords();
 
 /**
  * GET /api/feedbacks
@@ -9,7 +16,7 @@ import nc from "next-connect";
  * @param {import("next").NextApiResponse} res
  */
 async function getHandler(req, res) {
-  res.status(200).json({ message: "echo get method" });
+  res.status(200).json({ message: "OK", data });
 }
 
 /**
@@ -22,7 +29,14 @@ async function getHandler(req, res) {
  * @param {import("next").NextApiResponse} res
  */
 async function postHandler(req, res) {
-  res.status(200).json({ message: "echo post method" });
+  try {
+    const parsedRecord = createRecordObject(req.body?.email, req.body?.message);
+    const insertedData = insertRecord(data, parsedRecord)[0];
+
+    res.status(201).json({ message: "OK", data: insertedData });
+  } catch (e) {
+    res.status(400).json({ message: e.getMessage() });
+  }
 }
 
 const handler = nc().get(getHandler).post(postHandler);

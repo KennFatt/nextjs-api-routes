@@ -36,3 +36,6 @@ yarn-error.log*
 
 # Test reports
 test-reports/
+
+# Internal database
+data/
