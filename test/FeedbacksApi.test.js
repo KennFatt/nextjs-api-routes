@@ -130,13 +130,15 @@ describe("API Route: GET /api/feedbacks/[feedbackId]", () => {
     let response = null;
 
     beforeEach(async () => {
-      const postResponse = await axios.post(API_ENDPOINT, DUMMY_PAYLOAD, {
-        headers: { "Content-Type": "application/json" },
-      });
+      if (response === null) {
+        const postResponse = await axios.post(API_ENDPOINT, DUMMY_PAYLOAD, {
+          headers: { "Content-Type": "application/json" },
+        });
 
-      response = await axios.get(urlWithId(postResponse.data.data.id), {
-        validateStatus: false,
-      });
+        response = await axios.get(urlWithId(postResponse.data.data.id), {
+          validateStatus: false,
+        });
+      }
     });
 
     it("Should be returning 200 status if the feedback exists", async () => {
